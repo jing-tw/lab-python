@@ -9,3 +9,5 @@ pip install openpyxl pytest-qt webdriver-manager  --ignore-installed
 ```bash
 python demo.py
 ```
+
+
