@@ -1,14 +1,14 @@
 import selenium
 from selenium import webdriver
 from selenium.webdriver.support.select import Select
+
+# ActionChains are a way to automate low level interactions such as mouse movements, mouse button actions, key press, and context menu interactions.
+# This is useful for doing more complex actions like hover over and drag and drop.
 #from selenium.webdriver.common.action_chains import ActionChains   # for auto scroll
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.keys import Keys
+
 from webdriver_manager.chrome import ChromeDriverManager
 
-URL_TARGET = 'www.google.com'
+URL_TARGET = 'http://kimo.com.tw/'
 def main():
     options = webdriver.ChromeOptions()
     options.add_argument('--start-maximized')
