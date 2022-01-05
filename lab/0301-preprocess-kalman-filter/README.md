@@ -1,4 +1,4 @@
-# An Demo using kalman filter to get the most positive values
+# A Demo using kalman filter
 ```bash
 Step 1: Install Packages
 pip install matplotlib
