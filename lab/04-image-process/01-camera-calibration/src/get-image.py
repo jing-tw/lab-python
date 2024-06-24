@@ -47,20 +47,6 @@ def run():
     ok_num = 0
     while cap.isOpened():
         succes, img = cap.read()
-       
-        # check to find the corners
-        chessboardSize = (8,6)
-        gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-        ret, corners = cv.findChessboardCorners(gray, chessboardSize, None)
-        if ret == True:
-            ok_num = ok_num + 1
-            print('ok_num = ' + str(ok_num) + ', Found the corners')
-
-            objpoints.append(objp)
-            # draw the corner
-            corners2 = cv.cornerSubPix(gray, corners, (11,11), (-1,-1), criteria)
-            cv.drawChessboardCorners(img, chessboardSize, corners2, ret)
-        # end of check
 
         # control
         k = cv.waitKey(5)
@@ -71,7 +57,21 @@ def run():
             print("image saved!")
             num += 1
         # end of control
+       
+        # check to find the corners
+        chessboardSize = (8,6)
+        gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+        ret, corners = cv.findChessboardCorners(gray, chessboardSize, None)
+        if ret == True:
+            ok_num = ok_num + 1
+            print('ok_num = ' + str(ok_num) + ', Found the corners')
 
+            objpoints.append(objp)
+
+            # draw the corner
+            corners2 = cv.cornerSubPix(gray, corners, (11,11), (-1,-1), criteria)
+            cv.drawChessboardCorners(img, chessboardSize, corners2, ret)
+        # end of check
         cv.imshow('Img',img)
 
 

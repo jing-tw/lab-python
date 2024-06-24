@@ -80,16 +80,21 @@ def poseEstimation(camMatrix, distCoeff, option: DrawOption, nRows=8, nCols=6):
             cv. waitKey(1000)
 
 
-
 def calibration():
-    ################ FIND CHESSBOARD CORNERS - OBJECT POINTS AND IMAGE POINTS #############################
+    # Init
+    cameraMatrix = None # camera matrix
+    dist = None # distortion matrix
+    rvecs = None # rotation vector
+    tvecs = None # transport vector
+    objpoints = None # object location in world view (3D)
+    imgpoints = None # image points location in the camera view (2D)
 
+    ################ FIND CHESSBOARD CORNERS - OBJECT POINTS AND IMAGE POINTS #############################
     chessboardSize = (8,6)
     frameSize = (640,480)
 
     # termination criteria
     criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-
 
     # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
     objp = np.zeros((chessboardSize[0] * chessboardSize[1], 3), np.float32)
@@ -98,11 +103,9 @@ def calibration():
     size_of_chessboard_squares_mm = 10 #20
     objp = objp * size_of_chessboard_squares_mm
 
-
     # Arrays to store object points and image points from all the images.
     objpoints = [] # 3d point in real world space
     imgpoints = [] # 2d points in image plane.
-
 
     # images = sorted(glob.glob('images/*.png'))
     images = sorted(glob.glob(Config.ImagePath + str('*.png')))
@@ -110,36 +113,41 @@ def calibration():
 
     num = 0
     for image in images:
-        print('start to read image')
+        print('Read image, ', image)
 
         img = cv.imread(image)
         gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
 
         # Find the chess board corners
-        print('start to find the corners')
+        print('Find the corners')
         ret, corners = cv.findChessboardCorners(gray, chessboardSize, None)
 
+        if ret == False:
+            print('[Warning] No corners found. Skip the image.')
+            continue
+
         # If found, add object points, image points (after refining them)
-        if ret == True:
-            print('found the corners')
-            print('** Number of corners detected:', corners.shape[0])
+        print('found the corners')
+        print('** Number of corners detected:', corners.shape[0])
             
-            
-            objpoints.append(objp)
-            corners2 = cv.cornerSubPix(gray, corners, (11,11), (-1,-1), criteria)
-            imgpoints.append(corners)
+        objpoints.append(objp)
+        corners2 = cv.cornerSubPix(gray, corners, (11,11), (-1,-1), criteria)
+        imgpoints.append(corners)
 
-            # Draw and display the corners
-            cv.drawChessboardCorners(img, chessboardSize, corners2, ret)
-            cv.imshow('img', img)
-            cv.waitKey(1000)
+        # Draw and display the corners
+        cv.drawChessboardCorners(img, chessboardSize, corners2, ret)
+        cv.imshow('img', img)
+        cv.waitKey(1000)
 
-            # save the result for checking
-            cv.imwrite(Config.ResultPath + str('img') + str(num) + '.png', img)
-            num = num + 1
+        # save the result for checking
+        cv.imwrite(Config.ResultPath + str('img') + str(num) + '.png', img)
+        num = num + 1
 
     cv.destroyAllWindows()
-
+    if num == 0:
+        print('[Error] There is no suitiable imgpoints for calibration processing')
+        return False, cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints
+    
     # calibration
     ret, cameraMatrix, dist, rvecs, tvecs = cv.calibrateCamera(objpoints, imgpoints, frameSize, None, None)
     h = len(rvecs)
@@ -152,13 +160,12 @@ def calibration():
     print('Transfer vectors in (nx3) for each pattern images.\n\t h = ', h, ' w = ', w, ' tvecs = ', tvecs) 
     print('The first entry of tvecs = ', tvecs[0])
 
-
     # Save the camera calibration result for later use (we won't worry about rvecs / tvecs)
     pickle.dump((cameraMatrix, dist), open( "calibration.pkl", "wb" ))
     pickle.dump(cameraMatrix, open( "cameraMatrix.pkl", "wb" ))
     pickle.dump(dist, open( "dist.pkl", "wb" ))
 
-    return cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints
+    return True, cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints
 
 def undistortion(cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints):
     # UNDISTORTION
@@ -202,7 +209,10 @@ def undistortion(cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints):
     print( "total error: {}".format(mean_error/len(objpoints)))
 
 def main():
-    cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints = calibration()
+    success, cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints = calibration()
+    if success == False:
+        print('[Error] calibration faillure.')
+        return False
     undistortion(cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints)
     poseEstimation(cameraMatrix, dist, DrawOption.CUBE)
     
