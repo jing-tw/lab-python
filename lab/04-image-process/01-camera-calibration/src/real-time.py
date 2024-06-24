@@ -33,7 +33,7 @@ def run():
     # check the camera
     source = 0
     if not glob.glob("/dev/video?"):
-        print('No camera detected. Do you plug to the camera?')
+        print('No camera detected. Do you plug the camera?')
         return False
 
     cap = cv.VideoCapture(source)
