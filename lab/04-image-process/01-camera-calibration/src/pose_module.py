@@ -34,56 +34,10 @@ def drawCube(img, imgpts):
         img = cv.drawContours(img, [imgpts[4:]], -1, (0,0,255), 3)
     return img
 
-    
-def poseEstimation(camMatrix, distCoeff, option: DrawOption, nRows=8, nCols=6):
-    # Retreive calibration parameters 
-    # root = os.getcwd()
-    # camMatrix = np.load(os.path.join(root, "calibration.pkl"))
-    # distCoeff = np.load(os.path.join(root, "dist.pkl"))
-
-    # Read image
-    # imgPathList = glob.glob(os.path.join('./images/*.png'))
-    imgPathList = glob.glob(os.path.join(Config.ImagePath + str('*.png')))
-
-    # init
-    # nRows = 8
-    # nCols = 6
-    termCriteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-    worldPtsCur = np.zeros((nRows * nCols, 3), np.float32)
-    worldPtsCur[:,:2] = np.mgrid[0:nRows, 0:nCols].T.reshape(-1,2)
-
-    # World points of objects to be drawn
-    axis = np.float32([[3,0,0],[0,3,0],[0,0,-3]])
-    cubeCorners = np.float32([[0,0,0], [0,3,0],[3,3,0],[3,0,0],[0,0,-3],[0,3,-3],[3,3,-3],[3,0,-3]])
-
-    for curImgPath in imgPathList:   
-        imgBGR = cv.imread(curImgPath)
-        imgGray = cv.cvtColor(imgBGR, cv.COLOR_BGR2GRAY)
-        cornersFound, cornersOrg = cv.findChessboardCorners(imgGray, (nRows, nCols), None)
-
-        if cornersFound == True:                  
-            # calcuating the pose
-            cornersRefined = cv.cornerSubPix(imgGray, cornersOrg, (11,11), (-1,-1), termCriteria)
-            _, rvecs, tvecs = cv.solvePnP(worldPtsCur, cornersRefined, camMatrix, distCoeff)
-
-
-            # draw the pose
-            if option == DrawOption.AXES:
-                imgpts, _ = cv.projectPoints(axis, rvecs, tvecs, camMatrix, distCoeff)
-                imgBGR = drawAxes(imgBGR, cornersRefined, imgpts)
-
-            if option == DrawOption.CUBE:
-                imgpts, _ = cv.projectPoints(cubeCorners, rvecs, tvecs, camMatrix, distCoeff)
-                imgBGR = drawCube(imgBGR, imgpts)
-
-            cv.imshow('Chessboard', imgBGR)
-            cv. waitKey(1000)
-
-
 def calibration():
     # Init
     cameraMatrix = None # camera matrix
-    dist = None # distortion matrix
+    distCoeff = None # distortion matrix
     rvecs = None # rotation vector
     tvecs = None # transport vector
     objpoints = None # object location in world view (3D)
@@ -107,7 +61,6 @@ def calibration():
     objpoints = [] # 3d point in real world space
     imgpoints = [] # 2d points in image plane.
 
-    # images = sorted(glob.glob('images/*.png'))
     images = sorted(glob.glob(Config.ImagePath + str('*.png')))
     print('images', images)
 
@@ -146,36 +99,36 @@ def calibration():
     cv.destroyAllWindows()
     if num == 0:
         print('[Error] There is no suitiable imgpoints for calibration processing')
-        return False, cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints
+        return False, cameraMatrix, distCoeff, rvecs, tvecs, objpoints, imgpoints
     
     # calibration
-    ret, cameraMatrix, dist, rvecs, tvecs = cv.calibrateCamera(objpoints, imgpoints, frameSize, None, None)
+    ret, cameraMatrix, distCoeff, rvecs, tvecs = cv.calibrateCamera(objpoints, imgpoints, frameSize, None, None)
     h = len(rvecs)
     w = len(rvecs[0])
-    print('Rotation vectors in (nx3) for each pattern images.\n\t h = ', h, ' w = ', w, ' rvecs = ', rvecs) 
-    print('The first entry of rvecs = ', rvecs[0])
+    print('[debug] Rotation vectors in (nx3) for each pattern images.\n\t h = ', h, ' w = ', w, ' rvecs = ', rvecs) 
+    print('[debug] The first entry of rvecs = ', rvecs[0])
 
     h = len(tvecs)
     w = len(tvecs[0])
-    print('Transfer vectors in (nx3) for each pattern images.\n\t h = ', h, ' w = ', w, ' tvecs = ', tvecs) 
-    print('The first entry of tvecs = ', tvecs[0])
+    print('[debug] Transfer vectors in (nx3) for each pattern images.\n\t h = ', h, ' w = ', w, ' tvecs = ', tvecs) 
+    print('[debug] The first entry of tvecs = ', tvecs[0])
 
     # Save the camera calibration result for later use (we won't worry about rvecs / tvecs)
-    pickle.dump((cameraMatrix, dist), open( "calibration.pkl", "wb" ))
+    pickle.dump((cameraMatrix, distCoeff), open( "calibration.pkl", "wb" ))
     pickle.dump(cameraMatrix, open( "cameraMatrix.pkl", "wb" ))
-    pickle.dump(dist, open( "dist.pkl", "wb" ))
+    pickle.dump(distCoeff, open( "distCoeff.pkl", "wb" ))
 
-    return True, cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints
+    return True, cameraMatrix, distCoeff, rvecs, tvecs, objpoints, imgpoints
 
-def undistortion(cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints):
+def undistortion(cameraMatrix, distCoeff, rvecs, tvecs, objpoints, imgpoints):
     # UNDISTORTION
     img = cv.imread(Config.ImagePath + str('img4.png'))
     h,  w = img.shape[:2]
-    newCameraMatrix, roi = cv.getOptimalNewCameraMatrix(cameraMatrix, dist, (w,h), 1, (w,h))
-    print('img w, h = ' + str(w) + ' ' + str(h))
+    newCameraMatrix, roi = cv.getOptimalNewCameraMatrix(cameraMatrix, distCoeff, (w,h), 1, (w,h))
+    print('[debug] img w, h = ' + str(w) + ' ' + str(h))
 
     # Undistort
-    dst = cv.undistort(img, cameraMatrix, dist, None, newCameraMatrix)
+    dst = cv.undistort(img, cameraMatrix, distCoeff, None, newCameraMatrix)
     cv.imwrite(Config.ResultPath +str('dst.png'), dst)
 
     # crop the image
@@ -184,14 +137,14 @@ def undistortion(cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints):
     cv.imwrite(Config.ResultPath + str('caliResult1.png'), dst)
 
     # Undistort with Remapping
-    mapx, mapy = cv.initUndistortRectifyMap(cameraMatrix, dist, None, newCameraMatrix, (w,h), 5)
+    mapx, mapy = cv.initUndistortRectifyMap(cameraMatrix, distCoeff, None, newCameraMatrix, (w,h), 5)
 
     h,  w = img.shape[:2]
-    print('(before map) img w, h = ' + str(w) + ' ' + str(h))
+    print('[debug] (before map) img w, h = ' + str(w) + ' ' + str(h))
     dst = cv.remap(img, mapx, mapy, cv.INTER_LINEAR)
     cv.imwrite(Config.ResultPath + str('dst_remap.png'), dst)
     h,  w = dst.shape[:2]
-    print('dst_remap w, h = ' + str(w) + ' ' + str(h))
+    print('[debug] dst_remap w, h = ' + str(w) + ' ' + str(h))
 
     # # crop the image
     x, y, w, h = roi
@@ -202,19 +155,64 @@ def undistortion(cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints):
     mean_error = 0
 
     for i in range(len(objpoints)):
-        imgpoints2, _ = cv.projectPoints(objpoints[i], rvecs[i], tvecs[i], cameraMatrix, dist)
+        imgpoints2, _ = cv.projectPoints(objpoints[i], rvecs[i], tvecs[i], cameraMatrix, distCoeff)
         error = cv.norm(imgpoints[i], imgpoints2, cv.NORM_L2)/len(imgpoints2)
         mean_error += error
 
-    print( "total error: {}".format(mean_error/len(objpoints)))
+    print("total error: {}".format(mean_error/len(objpoints)))
+
+def poseEstimation(cameraMatrix, distCoeff, option: DrawOption, nRows, nCols):
+    # Retreive calibration parameters 
+    root = os.getcwd()
+    # cameraMatrix = np.load(os.path.join(root, "cameraMatrix.pkl"), allow_pickle=True)
+    # distCoeff = np.load(os.path.join(root, "distCoeff.pkl"), allow_pickle=True)
+    (cameraMatrix, distCoeff) = np.load(os.path.join(root, "calibration.pkl"), allow_pickle=True)
+    
+
+    # Read image
+    imgPathList = glob.glob(os.path.join(Config.ImagePath + str('*.png')))
+
+    # Init
+    termCriteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+    worldPtsCur = np.zeros((nRows * nCols, 3), np.float32)
+    worldPtsCur[:,:2] = np.mgrid[0:nRows, 0:nCols].T.reshape(-1,2)
+
+    # World points of objects to be drawn
+    axis = np.float32([[3,0,0],[0,3,0],[0,0,-3]])
+    cubeCorners = np.float32([[0,0,0], [0,3,0],[3,3,0],[3,0,0],[0,0,-3],[0,3,-3],[3,3,-3],[3,0,-3]])
+
+    for curImgPath in imgPathList:   
+        imgBGR = cv.imread(curImgPath)
+        imgGray = cv.cvtColor(imgBGR, cv.COLOR_BGR2GRAY)
+        cornersFound, cornersOrg = cv.findChessboardCorners(imgGray, (nRows, nCols), None)
+
+        if cornersFound == True:                  
+            # calcuating the pose
+            cornersRefined = cv.cornerSubPix(imgGray, cornersOrg, (11,11), (-1,-1), termCriteria)
+            _, rvecs, tvecs = cv.solvePnP(worldPtsCur, cornersRefined, cameraMatrix, distCoeff)
+
+
+            # draw the pose
+            if option == DrawOption.AXES:
+                imgpts, _ = cv.projectPoints(axis, rvecs, tvecs, cameraMatrix, distCoeff)
+                imgBGR = drawAxes(imgBGR, cornersRefined, imgpts)
+
+            if option == DrawOption.CUBE:
+                imgpts, _ = cv.projectPoints(cubeCorners, rvecs, tvecs, cameraMatrix, distCoeff)
+                imgBGR = drawCube(imgBGR, imgpts)
+
+            cv.imshow('Chessboard', imgBGR)
+            cv. waitKey(1000)
+
+
 
 def main():
-    success, cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints = calibration()
+    success, cameraMatrix, distCoeff, rvecs, tvecs, objpoints, imgpoints = calibration()
     if success == False:
         print('[Error] calibration faillure.')
         return False
-    undistortion(cameraMatrix, dist, rvecs, tvecs, objpoints, imgpoints)
-    poseEstimation(cameraMatrix, dist, DrawOption.CUBE)
+    undistortion(cameraMatrix, distCoeff, rvecs, tvecs, objpoints, imgpoints)
+    poseEstimation(cameraMatrix, distCoeff, DrawOption.CUBE, nRows=8, nCols=6)
     
 
 if __name__ == '__main__':
