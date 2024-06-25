@@ -1,38 +1,9 @@
-# Reference: 
-#  https://github.com/niconielsen32/CameraCalibration/blob/main/calibration.py
 import numpy as np
-import cv2 as cv
 import glob
 import pickle
-import os
+import cv2 as cv
 
 from config import Config
-
-class DrawOption:
-    AXES = 1
-    CUBE = 2
-
-def drawAxes(img, corners, imgpts):
-    def tupleOfInts(arr):
-        return tuple(int(x) for x in arr)
-    
-    corner = tupleOfInts(corners(0).ravel())
-    img = cv.line(img, corner, tupleOfInts(imgpts[0].ravel()), (255,0,0),5)
-    img = cv.line(img, corner, tupleOfInts(imgpts[1].ravel()), (255,0,0),5)
-    img = cv.line(img, corner, tupleOfInts(imgpts[2].ravel()), (255,0,0),5)
-
-def drawCube(img, imgpts):
-    imgpts = np.int32(imgpts).reshape(-1, 2)
-
-    # add green plane
-    img = cv.drawContours(img, [imgpts[:4]], -1, (0,255,0), -3)
-
-    # add box borders
-    for i in range(4):
-        j = i + 4
-        img = cv.line(img, tuple(imgpts[i]), tuple(imgpts[j]), (255), 3)
-        img = cv.drawContours(img, [imgpts[4:]], -1, (0,0,255), 3)
-    return img
 
 def calibration():
     # Init
@@ -72,7 +43,6 @@ def calibration():
         gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
 
         # Find the chess board corners
-        print('Find the corners')
         ret, corners = cv.findChessboardCorners(gray, chessboardSize, None)
 
         if ret == False:
@@ -80,7 +50,7 @@ def calibration():
             continue
 
         # If found, add object points, image points (after refining them)
-        print('found the corners')
+        print('Found the corners')
         print('** Number of corners detected:', corners.shape[0])
             
         objpoints.append(objp)
@@ -160,60 +130,3 @@ def undistortion(cameraMatrix, distCoeff, rvecs, tvecs, objpoints, imgpoints):
         mean_error += error
 
     print("total error: {}".format(mean_error/len(objpoints)))
-
-def poseEstimation(cameraMatrix, distCoeff, option: DrawOption, nRows, nCols):
-    # Retreive calibration parameters 
-    root = os.getcwd()
-    # cameraMatrix = np.load(os.path.join(root, "cameraMatrix.pkl"), allow_pickle=True)
-    # distCoeff = np.load(os.path.join(root, "distCoeff.pkl"), allow_pickle=True)
-    (cameraMatrix, distCoeff) = np.load(os.path.join(root, "calibration.pkl"), allow_pickle=True)
-    
-
-    # Read image
-    imgPathList = glob.glob(os.path.join(Config.ImagePath + str('*.png')))
-
-    # Init
-    termCriteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-    worldPtsCur = np.zeros((nRows * nCols, 3), np.float32)
-    worldPtsCur[:,:2] = np.mgrid[0:nRows, 0:nCols].T.reshape(-1,2)
-
-    # World points of objects to be drawn
-    axis = np.float32([[3,0,0],[0,3,0],[0,0,-3]])
-    cubeCorners = np.float32([[0,0,0], [0,3,0],[3,3,0],[3,0,0],[0,0,-3],[0,3,-3],[3,3,-3],[3,0,-3]])
-
-    for curImgPath in imgPathList:   
-        imgBGR = cv.imread(curImgPath)
-        imgGray = cv.cvtColor(imgBGR, cv.COLOR_BGR2GRAY)
-        cornersFound, cornersOrg = cv.findChessboardCorners(imgGray, (nRows, nCols), None)
-
-        if cornersFound == True:                  
-            # calcuating the pose
-            cornersRefined = cv.cornerSubPix(imgGray, cornersOrg, (11,11), (-1,-1), termCriteria)
-            _, rvecs, tvecs = cv.solvePnP(worldPtsCur, cornersRefined, cameraMatrix, distCoeff)
-
-
-            # draw the pose
-            if option == DrawOption.AXES:
-                imgpts, _ = cv.projectPoints(axis, rvecs, tvecs, cameraMatrix, distCoeff)
-                imgBGR = drawAxes(imgBGR, cornersRefined, imgpts)
-
-            if option == DrawOption.CUBE:
-                imgpts, _ = cv.projectPoints(cubeCorners, rvecs, tvecs, cameraMatrix, distCoeff)
-                imgBGR = drawCube(imgBGR, imgpts)
-
-            cv.imshow('Chessboard', imgBGR)
-            cv. waitKey(1000)
-
-
-
-def main():
-    success, cameraMatrix, distCoeff, rvecs, tvecs, objpoints, imgpoints = calibration()
-    if success == False:
-        print('[Error] calibration faillure.')
-        return False
-    undistortion(cameraMatrix, distCoeff, rvecs, tvecs, objpoints, imgpoints)
-    poseEstimation(cameraMatrix, distCoeff, DrawOption.CUBE, nRows=8, nCols=6)
-    
-
-if __name__ == '__main__':
-    main()

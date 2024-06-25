@@ -1,20 +1,18 @@
-# real-time 
 import cv2 as cv
 import numpy as np
-import glob
 
 from config import Config
-
+from cameraUtil import getCamera
 
 def main():
+    getImage()
+
+def getImage():
     print('Start to capture the image.')
     print('Usage:\n')
     print('\t[s] key to save image.')
     print('\t[Esc] key to exit.')
 
-    run()
-
-def run():
     chessboardSize = (8,6)
     frameSize = (640,480)
 
@@ -29,24 +27,32 @@ def run():
     size_of_chessboard_squares_mm = 10 #20
     objp = objp * size_of_chessboard_squares_mm
 
+    # # capture an image
+    # # check the camera
+    # source = 0
+    # if not glob.glob("/dev/video?"):
+    #     print('No camera detected. Do you plug the camera?')
+    #     return False
+
+    # cap = cv.VideoCapture(source)
+    # if cap is None or not cap.isOpened():
+    #    print('Warning: unable to open video source: ', source)
+    #    return False
+    
     # capture an image
-    # check the camera
-    source = 0
-    if not glob.glob("/dev/video?"):
-        print('No camera detected. Do you plug the camera?')
+    success, cap = getCamera()
+    if not success:
         return False
 
-    cap = cv.VideoCapture(source)
-    if cap is None or not cap.isOpened():
-       print('Warning: unable to open video source: ', source)
-       return False
-    
     num = 0
     criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
     ok_num = 0
     while cap.isOpened():
         succes, img = cap.read()
+        if not success:
+            print('capture image failure')
+            return False
 
         # control
         k = cv.waitKey(5)
@@ -74,11 +80,10 @@ def run():
         # end of check
         cv.imshow('Img',img)
 
-
     # Release and destroy all windows before termination
     cap.release()
-
     cv.destroyAllWindows()
+    return True
 
 if __name__ == '__main__':
     main()
